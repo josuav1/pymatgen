@@ -7,7 +7,9 @@ from __future__ import division, unicode_literals
 import logging
 
 from fractions import Fraction
-from numpy import around
+from itertools import permutations
+from random import shuffle
+import numpy as np
 
 from pymatgen.analysis.bond_valence import BVAnalyzer
 from pymatgen.analysis.ewald import EwaldSummation, EwaldMinimizer
@@ -681,6 +683,12 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
     Discretizes the site occupancies in a disordered structure; useful for
     grouping similar structures or as a pre-processing step for order-disorder
     transformations.
+    Uses the limit_denominator function for a first attempt to find discretized 
+    denominators.
+    If structure cannot be discretized within tolerance or the sum of occupancies 
+    per site is not 1, all possible nominators with occupancy sum per site of 1 
+    are tried, and the combination with minimized difference to the originial 
+    occupancies is chosen.
 
     Args:
         max_denominator:
@@ -688,24 +696,35 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
             denominator allows for finer resolution in the site occupancies.
         tol:
             A float that sets the maximum difference between the original and
-            discretized occupancies before throwing an error. If None, it is
-            set to 1 / (4 * max_denominator).
+            discretized occupancies before throwing an error.
         fix_denominator(bool): 
             If True, will enforce a common denominator for all species. 
             This prevents a mix of denominators (for example, 1/3, 1/4) 
             that might require large cell sizes to perform an enumeration.
             'tol' needs to be > 1.0 in some cases.
+        zerocc(bool): 
+            If True, will allow occupancies of zero for one or more species in 
+            the discretized structure.
+        rnd(bool): 
+            When True, all possible combinations of nominators with occupancy
+            sum per site of 1 are tried in random order. For instance, if the 
+            non-discretized occupancies are A=0.44, B=0.28, C=0.28 and 
+            max_denominator = 5, the result is either A=0.4, B=0.4, C=0.2 or
+            A=0.4, B=0.2, C=0.2. When false, only one of these results is returned,
+            whereas when True, either of them is randomly picked.
             
     """
 
-    def __init__(self, max_denominator=5, tol=None, fix_denominator=False):
+    def __init__(self, max_denominator=5, tol=0.05, fix_denominator=False, zerocc=False, rnd=True):
         self.max_denominator = max_denominator
-        self.tol = tol if tol is not None else 1 / (4 * max_denominator)
+        self.tol = tol
         self.fix_denominator = fix_denominator
+        self.zerocc = zerocc
+        self.rnd = rnd
 
     def apply_transformation(self, structure):
         """
-        Discretizes the site occupancies in the structure.
+        Discretizes the site occupancies in the structure. 
 
         Args:
             structure: disordered Structure to discretize occupancies
@@ -718,19 +737,106 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
 
         species = [dict(sp) for sp in structure.species_and_occu]
 
-        for sp in species:
-            for k, v in sp.items():
-                old_occ = sp[k]
-                new_occ = float(
-                    Fraction(old_occ).limit_denominator(self.max_denominator))
-                if self.fix_denominator:
-                    new_occ = around(old_occ*self.max_denominator)\
-                        / self.max_denominator
-                if round(abs(old_occ - new_occ), 6) > self.tol:
-                    raise RuntimeError(
-                        "Cannot discretize structure within tolerance!")
-                sp[k] = new_occ
+        new_occ_l = []
+        dictsp = []    
+        specl = []
 
+        for sp in species: 
+            dictsp = np.append(dictsp, dict(sp))
+        
+        # iterate over all lattice sites
+        for itr in range (0,len(dictsp)):
+
+            occs = 0
+            foundocc = False
+
+            # try different denominators, starting with 2 and ending with max_denominator
+            rng = range(2,self.max_denominator+1)
+
+            # only try max_denominator for fix_denominator = True
+            if self.fix_denominator:
+                rng = range(self.max_denominator,self.max_denominator+1)
+            
+            for w in rng:
+                # only execute if occupancies are not found yet and if this site is disordered
+                if not foundocc and len(dictsp[itr].items()) != 1:
+                    occlist = []
+                    diffmin = float('Inf')
+                    occst = ''
+                    occstr = ''
+                    new_occ = np.zeros(len(dictsp[itr].items()))
+                    n = new_occ
+                
+                    for sp, old_occ in dictsp[itr].items():
+                        occlist = np.append(occlist,old_occ)
+                        specl = np.append(specl, sp)
+
+                    # allow nominators of zero if zerocc = True
+                    if self.zerocc:
+                        a = 0
+                    else:
+                        a = 1
+
+                    for i in range (0+a,w):
+                        occst = occst + str(i)
+                
+                    for q in range (0,len(dictsp[itr].items())):
+                        occstr = occstr + occst
+                    
+                    # create a list of all possible permutations of nominators in fractional occupancy
+                    perm = list(permutations(occstr, len(dictsp[itr].items()))) 
+                    r = list(range(len(perm)))
+
+                    if self.rnd:
+                        shuffle(r)
+               
+                    for j in r:
+                        m = perm[j]
+                        occs = 0
+                        for k in range (0,len(m)):
+                            occs += (int(m[k])/w)
+                        occs = round(occs,2)
+                        
+                        # only use sets of nominators resulting in a total occupancy of 1.00
+                        if occs == 1.00:
+                            occdiff = 0
+                            foundocc = True
+                            new_occ_h = np.zeros(len(dictsp[itr].items()))
+                            for l in range (0,len(m)):
+                                occdiff += abs((int(m[l])/w) - occlist[l])
+                                new_occ_h[l] = int(m[l])/w
+                            if occdiff <= diffmin: 
+                                diffmin = occdiff
+                                n = m
+
+                    # if difference in discretized and original occupancy is larger than self.tol, reject value
+                    for t in range (0,len(n)):
+                        new_occ[t] = int(n[t])/w
+                        if round(abs(occlist[t] - new_occ[t]), 6) > self.tol:
+                            foundocc = False
+                    
+                    # otherwise append new occupancies to list and stop iteration over w
+                    if foundocc:
+                        new_occ_l = np.append(new_occ_l, new_occ)
+
+            # if site is ordered, append occupancy of 1.00 to occupancy list
+            if len(dictsp[itr].items()) == 1:
+                new_occ_l = np.append(new_occ_l, 1.00)
+                foundocc = True
+
+            # this should happen in very few cases, either if the tolerance or max_denominator are too low
+            if not foundocc:
+                raise RuntimeError(
+                        "Could not find occupancies within tolerance of " + str(self.tol)
+                        + " and an occupancy sum of 1.00 per site with a max_denominator of "
+                        + str(self.max_denominator))
+
+        for sp in species:
+            i = 0
+            for k, v in sp.items():
+                sp[k] = float(new_occ_l[i])
+                i += 1
+       
         return Structure(structure.lattice, species, structure.frac_coords)
 
     def __str__(self):
