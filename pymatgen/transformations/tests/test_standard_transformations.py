@@ -540,6 +540,18 @@ class DiscretizeOccupanciesTransformationTest(unittest.TestCase):
                                                        Element("Na"): 0.4,
                                                        Element("K"): 0.4})
 
+        # structures with non-stoichiometric occupancies, sum of site occupancies: 0.95
+        # non-stoichiometry < tolerance
+        s_orig_7 = Structure(l, [{"Li": 0.12, "Na": 0.15, "K": 0.73}, {"O": 1}],
+                             [[0, 0, 0], [0.5, 0.5, 0.5]])
+
+        # test large denominators
+        dot = DiscretizeOccupanciesTransformation(max_denominator=37, tol=0.02, fix_denominator=True, nonstoich=True)
+        s = dot.apply_transformation(s_orig_7)
+        self.assertEqual(dict(s[0].species_and_occu), {Element("Li"): Fraction(4 / 37),
+                                                       Element("Na"): Fraction(6 / 37),
+                                                       Element("K"): Fraction(27 / 37)})
+
 
 if __name__ == "__main__":
     unittest.main()
