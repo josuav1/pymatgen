@@ -725,14 +725,12 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
         if structure.is_ordered:
             return structure
 
-        species = [dict(sp) for sp in structure.species_and_occu]
-        spec_orig = []
-        for sp in species:
-            spec_orig = np.append(spec_orig, dict(sp))
-        new_occ = []
+        orig_sp_occu = [dict(sp) for sp in structure.species_and_occu]
+        new_sp_occu = []
 
         # iterate over all lattice sites
-        for itr in range(0, len(spec_orig)):
+        for itr in range(len(orig_sp_occu)):
+
             # reset foundocc(bool)
             foundocc = False
 
@@ -740,11 +738,16 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
             denomrng = range(2, self.max_denominator + 1)
             # instead only use max_denominator if fix_denominator = True
             if self.fix_denominator:
-                denomrng = range(self.max_denominator, self.max_denominator + 1)
+                denomrng = [self.max_denominator]
 
-            # if site is ordered, append occupancy of 1.00 to new occupancy list
-            if len(spec_orig[itr].items()) == 1:
-                new_occ = np.append(new_occ, 1.00)
+            old_site_occ = []
+            for sp, occ in orig_sp_occu[itr].items():
+                old_site_occ = np.append(old_site_occ, occ)
+
+            # if site is ordered (occupancy can be rounded to one within tolerance)
+            # append ordered occupancy of 1.00 to new occupancy list
+            if len(orig_sp_occu[itr].items()) == 1 and (abs(old_site_occ[-1] - 1) < self.tol):
+                new_sp_occu = np.append(new_sp_occu, 1.00)
                 foundocc = True
 
             for denom in denomrng:
@@ -752,10 +755,6 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
                 if not foundocc:
                     # reset minimum found occupancy difference
                     min_occ_diff = float('Inf')
-
-                    old_site_occ = []
-                    for sp, occ in spec_orig[itr].items():
-                        old_site_occ = np.append(old_site_occ, occ)
 
                     # allow nominators of zero if zerocc = True
                     if self.zerocc:
@@ -768,11 +767,11 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
 
                     # the permutation function does not repeat values, therefore we need to
                     # convert '1234' to '123412341234' if three species are present on this site
-                    noms_w_rep = np.tile(noms, len(spec_orig[itr].items()))
+                    noms_w_rep = np.tile(noms, len(orig_sp_occu[itr].items()))
 
                     # create a list of all permutations of nominators with length
                     # of the permutations corresponding to the amount of species on this site
-                    perm_raw = list(permutations(noms_w_rep, len(spec_orig[itr].items())))
+                    perm_raw = list(permutations(noms_w_rep, len(orig_sp_occu[itr].items())))
                     # remove duplicates
                     perm_raw.sort()
                     perm = list(perm_raw for perm_raw, _ in groupby(perm_raw))
@@ -782,7 +781,7 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
                     for j in r:
                         this_perm = perm[j]
                         occ_sum = 0
-                        for k in range(0, len(this_perm)):
+                        for k in range(len(this_perm)):
                             occ_sum += (int(this_perm[k]) / denom)
                         occ_sum = round(occ_sum, 2)
 
@@ -805,7 +804,7 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
                                     foundocc = True
                                     ambiguous = False
 
-                    new_site_occ = np.zeros(len(spec_orig[itr].items()))
+                    new_site_occ = np.zeros(len(orig_sp_occu[itr].items()))
                     if foundocc:
                         for t in range(0, len(best_perm)):
                             new_site_occ[t] = int(best_perm[t]) / denom
@@ -814,7 +813,7 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
                             if round(abs(old_site_occ[t] - new_site_occ[t]), 6) > self.tol:
                                 foundocc = False
                     if foundocc:
-                        new_occ = np.append(new_occ, new_site_occ)
+                        new_sp_occu = np.append(new_sp_occu, new_site_occ)
 
             # this should happen in very few cases, either if the tolerance or max_denominator are too low
             if not foundocc:
@@ -834,13 +833,13 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
                         + " and an occupancy sum of 1.00 per site with a max_denominator of "
                         + str(self.max_denominator))
 
-        for sp in species:
+        for sp in orig_sp_occu:
             i = 0
             for k, v in sp.items():
-                sp[k] = float(new_occ[i])
+                sp[k] = float(new_sp_occu[i])
                 i += 1
 
-        return Structure(structure.lattice, species, structure.frac_coords)
+        return Structure(structure.lattice, orig_sp_occu, structure.frac_coords)
 
     def __str__(self):
         return "DiscretizeOccupanciesTransformation"
