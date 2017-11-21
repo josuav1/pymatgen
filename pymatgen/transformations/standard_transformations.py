@@ -702,6 +702,7 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
             the discretized structure.
         nonstoich(bool): 
             If True, will allow occupancies different from 1.00 on lattice sites
+            if non-stoichiometry greater than tolerance is present in original structure
     """
 
     def __init__(self, max_denominator=5, tol=0.05, fix_denominator=False, zerocc=False, nonstoich=False):
@@ -791,8 +792,9 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
                         occ_sum = round(occ_sum, 2)
 
                         # only use sets of nominators resulting in a total occupancy of 1.00
-                        # except if non-stoichiometric compounds are enabled
-                        if occ_sum == 1.00 or self.nonstoich:
+                        # exception: use all sets of nominators if non-stoichiometric compounds are
+                        # enabled and non-stoichiometry in orig.structure is larger than tolerance
+                        if occ_sum == 1.00 or (self.nonstoich and (abs(sum(old_site_occ) - 1) > self.tol)):
                             # calculate the difference between the new and old occupancies
                             occ_diff = 0
                             for l in range(0, len(this_perm)):
