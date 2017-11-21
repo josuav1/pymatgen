@@ -540,8 +540,6 @@ class DiscretizeOccupanciesTransformationTest(unittest.TestCase):
                                                        Element("Na"): 0.4,
                                                        Element("K"): 0.4})
 
-        # structures with non-stoichiometric occupancies, sum of site occupancies: 0.95
-        # non-stoichiometry < tolerance
         s_orig_7 = Structure(l, [{"Li": 0.12, "Na": 0.15, "K": 0.73}, {"O": 1}],
                              [[0, 0, 0], [0.5, 0.5, 0.5]])
 
