@@ -763,17 +763,12 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
                     else:
                         min_nominator = 1
 
-                    # create a list of all nominators from min_denominator until denom as string
-                    # i.e. '1234' if denom = 4 and self.zerocc = False
-                    noms = ''
-                    for nominator in range(min_nominator, denom):
-                        noms = noms + str(nominator)
+                    # create a list of all nominators from min_denominator until denom
+                    noms = np.array(range(min_nominator, denom))
 
                     # the permutation function does not repeat values, therefore we need to
                     # convert '1234' to '123412341234' if three species are present on this site
-                    noms_w_rep = ''
-                    for q in range(0, len(spec_orig[itr].items())):
-                        noms_w_rep = noms_w_rep + noms
+                    noms_w_rep = np.tile(noms, len(spec_orig[itr].items()))
 
                     # create a list of all permutations of nominators with length
                     # of the permutations corresponding to the amount of species on this site
