@@ -524,10 +524,21 @@ class DiscretizeOccupanciesTransformationTest(unittest.TestCase):
         self.assertRaises(RuntimeError, dot.apply_transformation, s_orig_5)
 
         dot = DiscretizeOccupanciesTransformation(max_denominator=5, tol=0.10, fix_denominator=True, nonstoich=True)
-        s = dot.apply_transformation(s_orig_4)
+        s = dot.apply_transformation(s_orig_5)
         self.assertEqual(dict(s[0].species_and_occu), {Element("Li"): 0.4,
                                                        Element("Na"): 0.2,
                                                        Element("K"): 0.2})
+
+        # structures with non-stoichiometric occupancies, sum of site occupancies: 0.95
+        # non-stoichiometry < tolerance
+        s_orig_6 = Structure(l, [{"Li": 0.2, "Na": 0.4, "K": 0.35}, {"O": 1}],
+                             [[0, 0, 0], [0.5, 0.5, 0.5]])
+
+        dot = DiscretizeOccupanciesTransformation(max_denominator=5, tol=0.10, fix_denominator=True, nonstoich=True)
+        s = dot.apply_transformation(s_orig_6)
+        self.assertEqual(dict(s[0].species_and_occu), {Element("Li"): 0.2,
+                                                       Element("Na"): 0.4,
+                                                       Element("K"): 0.4})
 
 
 if __name__ == "__main__":
