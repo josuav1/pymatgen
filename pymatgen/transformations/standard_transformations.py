@@ -791,7 +791,7 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
                         if occ_sum == 1.00 or (self.nonstoich and (abs(sum(old_site_occ) - 1) > self.tol)):
                             # calculate the difference between the new and old occupancies
                             occ_diff = 0
-                            for l in range(0, len(this_perm)):
+                            for l in range(len(this_perm)):
                                 occ_diff += abs((int(this_perm[l]) / denom) - old_site_occ[l])
                             if occ_diff <= min_occ_diff:
                                 best_perm = this_perm
@@ -832,9 +832,8 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
                         "Could not find occupancies within tolerance of " + str(self.tol)
                         + " and an occupancy sum of 1.00 per site with a max_denominator of "
                         + str(self.max_denominator))
-
+        i = 0
         for sp in orig_sp_occu:
-            i = 0
             for k, v in sp.items():
                 sp[k] = float(new_sp_occu[i])
                 i += 1
