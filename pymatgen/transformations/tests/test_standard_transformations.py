@@ -550,6 +550,13 @@ class DiscretizeOccupanciesTransformationTest(unittest.TestCase):
                                                        Element("Na"): Fraction(6 / 37),
                                                        Element("K"): Fraction(27 / 37)})
 
+        # test defined sets of denominators
+        dot = DiscretizeOccupanciesTransformation(max_denominator=100, tol=0.05, def_denom=[12, 14], nonstoich=True)
+        s = dot.apply_transformation(s_orig_7)
+        self.assertEqual(dict(s[0].species_and_occu), {Element("Li"): Fraction(1 / 12),
+                                                       Element("Na"): Fraction(2 / 12),
+                                                       Element("K"): Fraction(9 / 12)})
+
         # test sites with single species occupancy and non-stoichiometry
         s_orig_8 = Structure(l, [{"Li": 0.12, "Na": 0.15, "K": 0.73}, {"O": 0.60}],
                              [[0, 0, 0], [0.5, 0.5, 0.5]])
