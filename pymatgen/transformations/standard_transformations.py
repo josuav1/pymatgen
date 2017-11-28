@@ -697,6 +697,9 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
             This prevents a mix of denominators (for example, 1/3, 1/4) 
             that might require large cell sizes to perform an enumeration.
             'tol' needs to be > 1.0 in some cases.
+        def_denom(array):
+            Use an defined set of denominators instead of trying all up to
+            max_denominator. Overrides max_denominator and fix_denominator.
         zerocc(bool): 
             If True, will allow occupancies of zero for one or more species in 
             the discretized structure.
@@ -705,10 +708,12 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
             if non-stoichiometry greater than tolerance is present in original structure
     """
 
-    def __init__(self, max_denominator=5, tol=0.05, fix_denominator=False, zerocc=False, nonstoich=False):
+    def __init__(self, max_denominator=5, tol=0.05, fix_denominator=False, def_denom=None, zerocc=False,
+                 nonstoich=False):
         self.max_denominator = max_denominator
         self.tol = tol
         self.fix_denominator = fix_denominator
+        self.def_denom = def_denom
         self.zerocc = zerocc
         self.nonstoich = nonstoich
 
@@ -739,10 +744,25 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
             # instead only use max_denominator if fix_denominator = True
             if self.fix_denominator:
                 denomrng = [self.max_denominator]
+            # or use a defined set of denominators
+            if self.def_denom and not isinstance(self.def_denom, int):
+                denomrng = self.def_denom
+            elif self.def_denom:
+                denomrng = [self.def_denom]
 
             old_site_occ = []
             for sp, occ in orig_sp_occu[itr].items():
                 old_site_occ = np.append(old_site_occ, occ)
+
+            # if the current site has the exact same occupancies as the previous one, don't do
+            # the calculation again, save time and use the old data instead
+            old_site_occ_before = []
+            if itr > 0:
+                for sp, occ in orig_sp_occu[itr - 1].items():
+                    old_site_occ_before = np.append(old_site_occ_before, occ)
+            if str(old_site_occ_before) == str(old_site_occ):
+                new_sp_occu = np.append(new_sp_occu, new_sp_occu[-len(old_site_occ_before):])
+                foundocc = True
 
             # if site is ordered (occupancy can be rounded to one within tolerance)
             # append ordered occupancy of 1.00 to new occupancy list
