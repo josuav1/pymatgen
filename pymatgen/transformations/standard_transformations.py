@@ -754,20 +754,20 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
             for sp, occ in orig_sp_occu[itr].items():
                 old_site_occ = np.append(old_site_occ, occ)
 
+            # if site is ordered (occupancy can be rounded to one within tolerance)
+            # append ordered occupancy of 1.00 to new occupancy list
+            if len(orig_sp_occu[itr].items()) == 1 and (abs(old_site_occ[-1] - 1) < self.tol):
+                new_sp_occu = np.append(new_sp_occu, 1.00)
+                foundocc = True
+
             # if the current site has the exact same occupancies as the previous one, don't do
             # the calculation again, save time and use the old data instead
             old_site_occ_before = []
             if itr > 0:
                 for sp, occ in orig_sp_occu[itr - 1].items():
                     old_site_occ_before = np.append(old_site_occ_before, occ)
-            if str(old_site_occ_before) == str(old_site_occ):
+            if (str(old_site_occ_before) == str(old_site_occ)) and not foundocc:
                 new_sp_occu = np.append(new_sp_occu, new_sp_occu[-len(old_site_occ_before):])
-                foundocc = True
-
-            # if site is ordered (occupancy can be rounded to one within tolerance)
-            # append ordered occupancy of 1.00 to new occupancy list
-            if len(orig_sp_occu[itr].items()) == 1 and (abs(old_site_occ[-1] - 1) < self.tol):
-                new_sp_occu = np.append(new_sp_occu, 1.00)
                 foundocc = True
 
             for denom in denomrng:
