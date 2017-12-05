@@ -708,8 +708,8 @@ class DiscretizeOccupanciesTransformation(AbstractTransformation):
             if non-stoichiometry greater than tolerance is present in original structure
     """
 
-    def __init__(self, max_denominator=5, tol=0.05, fix_denominator=False, def_denom=None, zerocc=False,
-                 nonstoich=False):
+    def __init__(self, max_denominator=100, tol=0.04, fix_denominator=False, def_denom=None, zerocc=False,
+                 nonstoich=True):
         self.max_denominator = max_denominator
         self.tol = tol
         self.fix_denominator = fix_denominator
